@@ -28,6 +28,8 @@ import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Exp
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeRowJoiner
 import org.apache.spark.sql.execution.SparkPlan
 import org.locationtech.jts.geom.Geometry
+import org.apache.sedona.core.enums.JoinBuildSide
+import org.apache.sedona.core.enums.JoinSparitionDominantSide
 
 trait TraitJoinQueryExec extends TraitJoinQueryBase {
   self: SparkPlan =>
@@ -60,6 +62,36 @@ trait TraitJoinQueryExec extends TraitJoinQueryBase {
     var sedonaConf = new SedonaConf(sparkContext.conf)
     val (leftShapes, rightShapes) =
       toSpatialRddPair(leftResultsRaw, boundLeftShape, rightResultsRaw, boundRightShape)
+
+        //choose dominant side
+    if(sedonaConf.getJoinSparitionDominantSide == JoinSparitionDominantSide.NONE){
+      log.info("[SedonaSQL] Choosing dominant join side. ")
+      //choose larger relation as dominant
+      //
+      // Analyze both relations if needed
+      if(leftShapes.approximateTotalCount == -1) {
+        log.info("[SedonaSQL] Analyzing left.")
+        leftShapes.analyze()
+      }
+      if(rightShapes.approximateTotalCount == -1) {
+        log.info("[SedonaSQL] Analyzing right.")
+        rightShapes.analyze()
+      }
+
+      //set dominant side and join approcimate total count
+      if(rightShapes.approximateTotalCount > leftShapes.approximateTotalCount) {
+        log.info("[SedonaSQL] Right side is dominant with estimated count: " + rightShapes.approximateTotalCount)
+        sedonaConf.setJoinSparitionDominantSide(JoinSparitionDominantSide.RIGHT)
+        sedonaConf.setJoinBuildSide(JoinBuildSide.RIGHT)
+        sedonaConf.setJoinApproximateTotalCount(rightShapes.approximateTotalCount)
+      }
+      else{
+        log.info("[SedonaSQL] Left side is dominant with estimated count: " + leftShapes.approximateTotalCount)
+        sedonaConf.setJoinSparitionDominantSide(JoinSparitionDominantSide.LEFT)
+        sedonaConf.setJoinBuildSide(JoinBuildSide.LEFT)
+        sedonaConf.setJoinApproximateTotalCount(leftShapes.approximateTotalCount)
+      }
+    }
 
     // Only do SpatialRDD analyze when the user doesn't know approximate total count of the spatial partitioning
     // dominant side rdd
