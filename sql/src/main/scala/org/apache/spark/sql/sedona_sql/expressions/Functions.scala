@@ -55,6 +55,9 @@ import org.locationtech.jts.geom.Coordinate
 import java.nio.ByteOrder
 import scala.util.{Failure, Success, Try}
 
+import org.apache.sedona.core.formatMapper.FormatMapper
+import org.apache.sedona.core.enums.{FileDataSplitter, GeometryType}
+
 /**
   * Return the distance between two geometries.
   *
@@ -298,6 +301,41 @@ case class ST_Centroid(inputExpressions: Seq[Expression])
   }
 
   override def dataType: DataType = GeometryUDT
+
+  override def children: Seq[Expression] = inputExpressions
+
+  protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
+    copy(inputExpressions = newChildren)
+  }
+}
+
+/**
+ * Test if WKT is syntactically correct.
+ *
+ * @param inputExpressions
+ */
+case class ST_WKTIsSyntacticallyCorrect(inputExpressions: Seq[Expression])
+  extends Expression with CodegenFallback {
+  override def nullable: Boolean = true
+
+  override def eval(input: InternalRow): Any = {
+
+    assert(inputExpressions.length == 1)
+
+    try {
+      val geomString = inputExpressions(0).eval(input).asInstanceOf[UTF8String].toString
+      var fileDataSplitter = FileDataSplitter.WKT
+      var formatMapper = new FormatMapper(fileDataSplitter, false)
+      var geometry = formatMapper.readGeometry(geomString)
+      GeometrySerializer.serialize(geometry)
+    } catch {
+      case e: Exception => return false
+    }
+
+    return true
+  }
+
+  override def dataType: DataType = BooleanType
 
   override def children: Seq[Expression] = inputExpressions
 

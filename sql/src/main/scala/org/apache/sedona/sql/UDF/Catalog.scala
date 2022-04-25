@@ -139,7 +139,8 @@ object Catalog {
     RS_HTML,
     RS_Array,
     RS_Normalize,
-    RS_Append
+    RS_Append,
+    ST_WKTIsSyntacticallyCorrect
   )
 
   val aggregateExpressions: Seq[Aggregator[Geometry, Geometry, Geometry]] = Seq(
