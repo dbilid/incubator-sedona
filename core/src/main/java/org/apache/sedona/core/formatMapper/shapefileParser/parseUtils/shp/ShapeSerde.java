@@ -160,7 +160,9 @@ public class ShapeSerde
     private static void putHeader(ByteBuffer buffer, ShapeType type, int numPoints, int numParts)
     {
         putType(buffer, type);
-        buffer.position(buffer.position() + 4 * ShapeFileConst.DOUBLE_LENGTH);
+        //cast to Buffer to avoid error java.lang.NoSuchMethodError: java.nio.ByteBuffer.position(I)Ljava/nio/ByteBuffer
+        //when running on Java 8
+        ((java.nio.Buffer) buffer).position(buffer.position() + 4 * ShapeFileConst.DOUBLE_LENGTH);
         buffer.putInt(numParts);
         buffer.putInt(numPoints);
     }
